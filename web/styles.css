@@ -158,8 +158,29 @@ ol li::marker {
 }
 
 .latex {
+    display: block;
+    overflow-x: auto;
+    padding: 1rem 0.5rem;
     font-size: 1.2rem;
-    margin-left: 0.5rem;
+    margin-top: 0.5rem;
+    max-width: 100%;
+    scrollbar-width: thin;
+    scrollbar-color: #667eea #e9ecef;
+}
+
+/* Custom scrollbar for Webkit browsers */
+.latex::-webkit-scrollbar {
+    height: 6px;
+}
+
+.latex::-webkit-scrollbar-track {
+    background: #e9ecef;
+    border-radius: 3px;
+}
+
+.latex::-webkit-scrollbar-thumb {
+    background-color: #667eea;
+    border-radius: 3px;
 }
 
 footer {
