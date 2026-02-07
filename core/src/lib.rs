@@ -404,9 +404,61 @@ fn generate_quadratic_inequality(difficulty: Difficulty) -> Problem {
         }
     };
     
+    // Check if the underlying quadratic came with a symbolic solution (surds)
+    // and if so, construct a symbolic solution for the inequality.
+    let explicit_sol = if let Some(base_str) = &prob.explicit_solution {
+        if base_str.starts_with("x = ") && base_str.contains("\\pm \\sqrt{") {
+            let parts: Vec<&str> = base_str.split("\\pm \\sqrt{").collect();
+            if parts.len() == 2 {
+                let p_str = parts[0].trim_start_matches("x = ").trim();
+                let q_str = parts[1].trim_end_matches('}');
+                
+                let sqrt_part = format!("\\sqrt{{{}}}", q_str);
+                
+                let min_s = if p_str == "0" {
+                    format!("-{}", sqrt_part)
+                } else {
+                    format!("{} - {}", p_str, sqrt_part)
+                };
+                
+                let max_s = if p_str == "0" {
+                    sqrt_part
+                } else {
+                    format!("{} + {}", p_str, sqrt_part)
+                };
+
+                let (opener, closer) = match final_rel {
+                    Relation::Lte | Relation::Gte => ('[', ']'),
+                    _ => ('(', ')'),
+                };
+
+                match &sol_set {
+                    SolutionSet::Finite(..) => {
+                        Some(format!("x \\in {}{}, {}{}", opener, min_s, max_s, closer))
+                    },
+                    SolutionSet::External(..) => {
+                         // External: (-inf, min) U (max, +inf)
+                         // The bracket on min/max generally follows the relation inclusive/exclusive logic
+                         // But for External, if problem is ">", result is x < min OR x > max.
+                         // Strict > means strict < and > in solution.
+                         // Non-strict >= means <= and >= in solution.
+                         Some(format!("x \\in (-\\infty, {}{} \\cup {}{}, +\\infty)", min_s, closer, opener, max_s))
+                    },
+                     _ => None
+                }
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
     prob.relation = final_rel;
     prob.solution_set = Some(sol_set);
-    prob.explicit_solution = None;
+    prob.explicit_solution = explicit_sol;
     
     prob
 }
