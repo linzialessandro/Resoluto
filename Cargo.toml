@@ -1,0 +1,16 @@
+[workspace]
+resolver = "2"
+members = [
+    "core",
+    "cli",
+    "web",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["Alessandro Linzi"]
+license = "MIT"
+
+[workspace.dependencies]
+getrandom = { version = "0.2", features = ["js"] }

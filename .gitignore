@@ -1,0 +1,19 @@
+/target/
+**/*.rs.bk
+*.pdb
+Cargo.lock
+
+# Web build artifacts
+web/dist/
+web/.trunk/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
