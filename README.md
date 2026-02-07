@@ -22,7 +22,7 @@ Resoluto is a tool built by a mathematics teacher for fellow educators. It gener
 | **Quadratic Equations** | `ax² + bx + c = 0` | Easy, Medium, Hard |
 | **Rational Equations** | Equations with fractions like `A/(x-p) + B/(x-q) = K` | Easy, Medium, Hard |
 | **Irrational Equations** | Equations with square roots like `√(Ax+B) = C` | Easy, Medium, Hard |
-| **Absolute Value Equations** | Equations with `|...|` like `|Ax+B| = C` | Easy, Medium, Hard |
+| **Absolute Value Equations** | Equations with `\|...\|` like `\|Ax+B\| = C` | Easy, Medium, Hard |
 
 ### Core Capabilities
 
