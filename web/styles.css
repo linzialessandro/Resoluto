@@ -291,10 +291,10 @@ ol li {
     counter-increment: item;
     margin-bottom: 1rem;
     padding: 1.25rem 1.5rem;
-    background: rgba(255, 255, 255, 0.05);
+    background: rgba(15, 15, 35, 0.8);
     border-radius: 16px;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(102, 126, 234, 0.2);
     position: relative;
     display: flex;
     align-items: flex-start;
@@ -317,8 +317,8 @@ ol li::before {
 }
 
 ol li:hover {
-    background: rgba(255, 255, 255, 0.08);
-    border-color: rgba(102, 126, 234, 0.3);
+    background: rgba(20, 20, 50, 0.95);
+    border-color: rgba(102, 126, 234, 0.5);
     transform: translateX(8px);
 }
 
