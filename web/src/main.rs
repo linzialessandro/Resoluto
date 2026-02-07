@@ -169,7 +169,7 @@ fn app() -> Html {
                             <ol>
                                 {for problems.iter().enumerate().map(|(i, p)| html! {
                                     <li key={format!("prob-{}-{}", i, p.to_latex())} class="problem">
-                                        <span class="latex">{format!("\\({}\\)", p.to_latex())}</span>
+                                        <span class="latex">{format!("${}$", p.to_latex())}</span>
                                     </li>
                                 })}
                             </ol>
@@ -180,7 +180,7 @@ fn app() -> Html {
                             <ol>
                                 {for problems.iter().enumerate().map(|(i, p)| html! {
                                     <li key={format!("sol-{}-{}", i, p.solution_latex())} class="solution">
-                                        <span class="latex">{format!("\\({}\\)", p.solution_latex())}</span>
+                                        <span class="latex">{format!("${}$", p.solution_latex())}</span>
                                     </li>
                                 })}
                             </ol>
