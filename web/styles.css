@@ -348,9 +348,37 @@ ol li:hover {
     border-radius: 10px;
 }
 
-/* MathJax color override */
-.MathJax {
+/* MathJax color override - comprehensive */
+.MathJax,
+.MathJax_Display,
+.MathJax svg,
+.MathJax path,
+mjx-container,
+mjx-container[jax="CHTML"],
+mjx-math,
+mjx-mi,
+mjx-mo,
+mjx-mn,
+mjx-mrow,
+mjx-mfrac,
+mjx-msqrt,
+mjx-mroot,
+mjx-msub,
+mjx-msup,
+mjx-msubsup {
     color: #fff !important;
+    fill: #fff !important;
+}
+
+mjx-container[jax="CHTML"] {
+    direction: ltr;
+}
+
+/* Ensure SVG strokes are white too */
+.MathJax svg path,
+mjx-container svg path {
+    stroke: #fff !important;
+    fill: #fff !important;
 }
 
 footer {
