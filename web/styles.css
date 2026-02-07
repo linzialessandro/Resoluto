@@ -166,33 +166,44 @@ label {
 select,
 input[type="number"] {
     padding: 1rem 1.25rem;
-    border: 1px solid rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.2);
     border-radius: 16px;
     font-size: 1rem;
     font-weight: 500;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    background: rgba(255, 255, 255, 0.08);
+    background: rgba(26, 26, 46, 0.9);
     color: #fff;
     cursor: pointer;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+}
+
+select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='white' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10l-5 5z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 1rem center;
+    padding-right: 2.5rem;
 }
 
 select option {
     background: #1a1a2e;
     color: #fff;
+    padding: 0.5rem;
 }
 
 select:hover,
 input[type="number"]:hover {
-    border-color: rgba(102, 126, 234, 0.5);
-    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(102, 126, 234, 0.6);
+    background: rgba(26, 26, 46, 1);
 }
 
 select:focus,
 input[type="number"]:focus {
     outline: none;
     border-color: #667eea;
-    box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.2);
-    background: rgba(255, 255, 255, 0.15);
+    box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.25);
+    background: rgba(26, 26, 46, 1);
 }
 
 .generate-btn {
