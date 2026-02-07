@@ -26,12 +26,62 @@ impl Difficulty {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Relation {
+    Eq,
+    Lt,
+    Gt,
+    Lte,
+    Gte,
+    Neq,
+}
+
+impl Relation {
+    pub fn to_latex(&self) -> &'static str {
+        match self {
+            Relation::Eq => "=",
+            Relation::Lt => "<",
+            Relation::Gt => ">",
+            Relation::Lte => "\\leq",
+            Relation::Gte => "\\geq",
+            Relation::Neq => "\\neq",
+        }
+    }
+
+    pub fn flip(&self) -> Self {
+        match self {
+            Relation::Eq => Relation::Eq,
+            Relation::Lt => Relation::Gt,
+            Relation::Gt => Relation::Lt,
+            Relation::Lte => Relation::Gte,
+            Relation::Gte => Relation::Lte,
+            Relation::Neq => Relation::Neq,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum SolutionSet {
+    Finite(f64, f64),           // x \in (a, b)
+    External(f64, f64),         // x < a U x > b
+    Ray(f64, Relation),         // x > a or x <= a
+    Union(Vec<SolutionSet>),    // General union of sets
+    Empty,                      // No solution
+    AllReal,                    // All real numbers
+    Set(Vec<f64>),             // Discrete set (old roots)
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ProblemType {
     Linear,
     Quadratic,
     Rational,
     Irrational,
     AbsoluteValue,
+    LinearInequality,
+    QuadraticInequality,
+    RationalInequality,
+    IrrationalInequality,
+    AbsoluteValueInequality,
 }
 
 impl ProblemType {
@@ -42,6 +92,11 @@ impl ProblemType {
             ProblemType::Rational => "rational",
             ProblemType::Irrational => "irrational",
             ProblemType::AbsoluteValue => "absolute-value",
+            ProblemType::LinearInequality => "linear-inequality",
+            ProblemType::QuadraticInequality => "quadratic-inequality",
+            ProblemType::RationalInequality => "rational-inequality",
+            ProblemType::IrrationalInequality => "irrational-inequality",
+            ProblemType::AbsoluteValueInequality => "absolute-value-inequality",
         }
     }
 }
@@ -59,6 +114,9 @@ pub struct Problem {
     pub lhs_expr: Option<Expr>,
     pub rhs_expr: Option<Expr>,
     
+    pub relation: Relation,
+    pub solution_set: Option<SolutionSet>,
+    
     pub explicit_solution: Option<String>,
     pub debug_info: String,
 }
@@ -66,7 +124,7 @@ pub struct Problem {
 impl Problem {
     pub fn to_latex(&self) -> String {
         if let (Some(lhs), Some(rhs)) = (&self.lhs_expr, &self.rhs_expr) {
-            format!("{} = {}", lhs.to_latex(), rhs.to_latex())
+            format!("{} {} {}", lhs.to_latex(), self.relation.to_latex(), rhs.to_latex())
         } else {
             match self.problem_type {
                 ProblemType::Linear => self.format_linear(),
@@ -79,6 +137,44 @@ impl Problem {
     pub fn solution_latex(&self) -> String {
         if let Some(explicit) = &self.explicit_solution {
             return explicit.clone();
+        }
+        
+        if let Some(sol_set) = &self.solution_set {
+            return match sol_set {
+                SolutionSet::Finite(a, b) => format!("x \\in ({}, {})", format_number(*a), format_number(*b)),
+                SolutionSet::External(a, b) => format!("x \\in (-\\infty, {}) \\cup ({}, +\\infty)", format_number(*a), format_number(*b)),
+                SolutionSet::Ray(a, rel) => {
+                    match rel {
+                        Relation::Lt => format!("x \\in (-\\infty, {})", format_number(*a)),
+                        Relation::Lte => format!("x \\in (-\\infty, {}]", format_number(*a)),
+                        Relation::Gt => format!("x \\in ({}, +\\infty)", format_number(*a)),
+                        Relation::Gte => format!("x \\in [{}, +\\infty)", format_number(*a)),
+                        _ => format!("x {} {}", rel.to_latex(), format_number(*a))
+                    }
+                },
+                SolutionSet::Union(sets) => {
+                     let intervals = sets.iter().map(|s| {
+                         match s {
+                            SolutionSet::Finite(a, b) => format!("({}, {})", format_number(*a), format_number(*b)),
+                            SolutionSet::External(a, b) => format!("(-\\infty, {}) \\cup ({}, +\\infty)", format_number(*a), format_number(*b)),
+                            SolutionSet::Ray(a, rel) => {
+                                match rel {
+                                    Relation::Lt => format!("(-\\infty, {})", format_number(*a)),
+                                    Relation::Lte => format!("(-\\infty, {}]", format_number(*a)),
+                                    Relation::Gt => format!("({}, +\\infty)", format_number(*a)),
+                                    Relation::Gte => format!("[{}, +\\infty)", format_number(*a)),
+                                    _ => format!("x {} {}", rel.to_latex(), format_number(*a))
+                                }
+                            },
+                            _ => String::from("...") // Nested unions not fully supported for simple display yet
+                         }
+                     }).collect::<Vec<_>>().join(" \\cup ");
+                     format!("x \\in {}", intervals)
+                },
+                SolutionSet::Empty => String::from("\\emptyset"),
+                SolutionSet::AllReal => String::from("\\mathbb{R}"),
+                SolutionSet::Set(vals) => vals.iter().map(|v| format!("x = {}", format_number(*v))).collect::<Vec<_>>().join(", "),
+            };
         }
         
         if self.root_count == 1 {
@@ -216,6 +312,852 @@ pub fn generate_problem(
         ProblemType::Rational => generate_rational(difficulty),
         ProblemType::Irrational => generate_irrational(difficulty),
         ProblemType::AbsoluteValue => generate_absolute(difficulty),
+        ProblemType::LinearInequality => generate_linear_inequality(difficulty),
+        ProblemType::QuadraticInequality => generate_quadratic_inequality(difficulty),
+        ProblemType::RationalInequality => generate_rational_inequality(difficulty),
+        ProblemType::IrrationalInequality => generate_irrational_inequality(difficulty),
+        ProblemType::AbsoluteValueInequality => generate_absolute_inequality(difficulty),
+    }
+}
+
+fn generate_linear_inequality(difficulty: Difficulty) -> Problem {
+    let mut prob = generate_linear(difficulty);
+    prob.problem_type = ProblemType::LinearInequality;
+    
+    let rel = match random_range(0, 3) {
+        0 => Relation::Gt,
+        1 => Relation::Lt,
+        2 => Relation::Gte,
+        _ => Relation::Lte,
+    };
+    
+    let m = prob.a;
+    let r = prob.roots[0];
+    
+    let sol_is_gt = random_range(0, 1) == 0;
+    let is_strict = matches!(rel, Relation::Gt | Relation::Lt);
+    
+    let sol_rel = if sol_is_gt {
+        if is_strict { Relation::Gt } else { Relation::Gte }
+    } else {
+        if is_strict { Relation::Lt } else { Relation::Lte }
+    };
+    
+    let prob_rel = if m > 0 {
+        sol_rel
+    } else {
+        sol_rel.flip()
+    };
+    
+    prob.relation = prob_rel;
+    prob.solution_set = Some(SolutionSet::Ray(r, sol_rel));
+    prob.explicit_solution = None;
+    
+    prob
+}
+
+fn generate_quadratic_inequality(difficulty: Difficulty) -> Problem {
+    let mut prob = generate_quadratic(difficulty);
+    prob.problem_type = ProblemType::QuadraticInequality;
+    
+    let r1 = prob.roots[0];
+    let r2 = prob.roots[1];
+    let (min, max) = if r1 < r2 { (r1, r2) } else { (r2, r1) };
+    
+    let internal = random_range(0, 1) == 0;
+    let strict = random_range(0, 1) == 0;
+    
+    let a = prob.a;
+    let opens_up = a > 0;
+    
+    let (prob_rel, sol_set) = if internal {
+        let rel = if opens_up {
+            if strict { Relation::Lt } else { Relation::Lte }
+        } else {
+            if strict { Relation::Gt } else { Relation::Gte }
+        };
+        
+        if strict {
+            (rel, SolutionSet::Finite(min, max))
+        } else {
+            (Relation::Lt, SolutionSet::Finite(min, max))
+        }
+    } else {
+        let rel = if opens_up {
+            if strict { Relation::Gt } else { Relation::Gte }
+        } else {
+            if strict { Relation::Lt } else { Relation::Lte }
+        };
+        
+        if strict {
+            (rel, SolutionSet::External(min, max))
+        } else {
+            (Relation::Gt, SolutionSet::External(min, max))
+        }
+    };
+    
+    let final_rel = if strict { prob_rel } else {
+        match prob_rel {
+            Relation::Lte => Relation::Lt,
+            Relation::Gte => Relation::Gt,
+            _ => prob_rel
+        }
+    };
+    
+    prob.relation = final_rel;
+    prob.solution_set = Some(sol_set);
+    prob.explicit_solution = None;
+    
+    prob
+}
+
+fn generate_rational_inequality(difficulty: Difficulty) -> Problem {
+    // Generate P(x)/Q(x).
+    // Analyze sign changes at roots and poles.
+    // For simplicity, reuse rational equation generator, get LHS - RHS,
+    // and analyze the resulting rational function sign.
+    // This is complex because generate_rational often results in P/Q = K.
+    // We can move K to LHS: P/Q - K.
+    
+    // Simpler strategy:
+    // Generate (x-r1)/(x-r2) > 0 or < 0.
+    // Or (x-r1)(x-r2)/(x-r3) ...
+    
+    // Let's implement a specific generator for inequalities rather than reusing equation gen
+    // to ensure cleaner sign analysis.
+    
+    loop {
+        // Structure: (x - a) / (x - b) REL 0
+        // Difficulty Easy/Medium.
+        // Hard: (x-a)(x-b)/(x-c)
+        
+        let r1 = random_range(-5, 5);
+        let r2 = random_range(-5, 5);
+        if r1 == r2 { continue; }
+        
+        let num = Expr::Sum(vec![
+            Expr::Term(Term::new(1, 1)),
+            Expr::Term(Term::new(-r1, 0))
+        ]);
+        let den = Expr::Sum(vec![
+            Expr::Term(Term::new(1, 1)),
+            Expr::Term(Term::new(-r2, 0))
+        ]);
+        
+        // Form: (x - r1) / (x - r2) > 0
+        // Critical points: r1, r2.
+        // Sign changes at each.
+        // If r1 < r2:
+        //    x < r1: (-)/(-) = +
+        //    r1 < x < r2: (+)/(-) = -
+        //    x > r2: (+)/(+) = +
+        
+        let (min, max) = if r1 < r2 { (r1, r2) } else { (r2, r1) };
+        let is_positive_req = random_range(0, 1) == 0; // > 0
+        
+        let sol = if is_positive_req {
+            SolutionSet::External(min as f64, max as f64)
+        } else {
+            SolutionSet::Finite(min as f64, max as f64)
+        };
+        
+        let rel = if is_positive_req { Relation::Gt } else { Relation::Lt };
+        
+        let lhs = Expr::Fraction {
+            num: Box::new(num),
+            den: Box::new(den),
+        };
+        
+        let rhs = Expr::Term(Term::new(0, 0));
+        
+        return Problem {
+            problem_type: ProblemType::RationalInequality,
+            difficulty,
+            a: 0, b: 0, c: 0,
+            roots: [r1 as f64, r2 as f64],
+            root_count: 2,
+            lhs_expr: Some(lhs),
+            rhs_expr: Some(rhs),
+            relation: rel,
+            solution_set: Some(sol),
+            explicit_solution: None,
+            debug_info: format!("Rational Ineq. r1={}, r2={}", r1, r2),
+        };
+    }
+}
+
+fn generate_irrational_inequality(difficulty: Difficulty) -> Problem {
+    let template = match difficulty {
+        Difficulty::Easy => if random_range(0, 2) == 0 { 0 } else { 1 },
+        Difficulty::Medium => random_range(2, 4),
+        Difficulty::Hard => random_range(4, 7),
+    };
+
+    match template {
+        6 => generate_irrational_inequality_double(difficulty),
+        5 => generate_irrational_inequality_advanced_isolation(difficulty),
+        4 => generate_irrational_inequality_two_radicals(difficulty),
+        3 => generate_irrational_inequality_linear_rhs(difficulty),
+        2 => generate_irrational_inequality_displaced(difficulty),
+        1 => generate_irrational_inequality_simple(difficulty),
+        _ => generate_irrational_inequality_basic(difficulty),
+    }
+}
+
+fn generate_irrational_inequality_basic(difficulty: Difficulty) -> Problem {
+    let r = random_range(-5, 5);
+    let k = random_range(1, 5);
+    let is_lt = random_range(0, 1) == 0;
+    
+    let lhs = Expr::Sqrt(Box::new(Expr::Sum(vec![
+        Expr::Term(Term::new(1, 1)),
+        Expr::Term(Term::new(-r, 0))
+    ])));
+    let rhs = Expr::Term(Term::new(k, 0));
+    
+    let sol = if is_lt {
+        SolutionSet::Finite(r as f64, (r + k*k) as f64)
+    } else {
+        SolutionSet::Ray((r + k*k) as f64, Relation::Gt)
+    };
+    
+    let rel = if is_lt { Relation::Lt } else { Relation::Gt };
+    
+    Problem {
+        problem_type: ProblemType::IrrationalInequality,
+        difficulty,
+        a: 0, b: 0, c: 0,
+        roots: [r as f64, 0.0],
+        root_count: 1,
+        lhs_expr: Some(lhs),
+        rhs_expr: Some(rhs),
+        relation: rel,
+        solution_set: Some(sol),
+        explicit_solution: None,
+        debug_info: format!("Irr Ineq Basic. r={}, k={}", r, k),
+    }
+}
+
+fn generate_irrational_inequality_simple(difficulty: Difficulty) -> Problem {
+    loop {
+        let x = random_range(-10, 10);
+        let c = random_range(1, 10);
+        let is_lt = random_range(0, 1) == 0;
+        
+        let a = loop { let v = random_range(1, 6); if v != 0 { break v; } };
+        let val_sq = c * c;
+        let b = val_sq - a * x;
+        
+        if b.abs() > 50 { continue; }
+        if a * x + b < 0 { continue; }
+        
+        let lhs = Expr::Sqrt(Box::new(Expr::Sum(vec![
+            Expr::Term(Term::new(a, 1)),
+            Expr::Term(Term::new(b, 0))
+        ])));
+        let rhs = Expr::Term(Term::new(c, 0));
+        
+        let sol = if is_lt {
+            let domain_start = (-b as f64) / (a as f64);
+            SolutionSet::Finite(domain_start, x as f64)
+        } else {
+            SolutionSet::Ray(x as f64, Relation::Gt)
+        };
+        
+        let rel = if is_lt { Relation::Lt } else { Relation::Gt };
+        
+        return Problem {
+            problem_type: ProblemType::IrrationalInequality,
+            difficulty,
+            a: 0, b: 0, c: 0,
+            roots: [x as f64, 0.0],
+            root_count: 1,
+            lhs_expr: Some(lhs),
+            rhs_expr: Some(rhs),
+            relation: rel,
+            solution_set: Some(sol),
+            explicit_solution: None,
+            debug_info: format!("Irr Ineq Simple. x={}", x),
+        };
+    }
+}
+
+fn generate_irrational_inequality_displaced(difficulty: Difficulty) -> Problem {
+    loop {
+        let x = random_range(-10, 10);
+        let c = random_range(1, 10);
+        let is_lt = random_range(0, 1) == 0;
+        
+        let a = loop { let v = random_range(1, 6); if v != 0 { break v; } };
+        let val_sq = c * c;
+        let b = val_sq - a * x;
+        
+        if b.abs() > 50 { continue; }
+        
+        let k = random_range(-5, 5);
+        let d = c + k;
+        
+        let lhs = Expr::Sum(vec![
+            Expr::Sqrt(Box::new(Expr::Sum(vec![
+                Expr::Term(Term::new(a, 1)),
+                Expr::Term(Term::new(b, 0))
+            ]))),
+            Expr::Term(Term::new(k, 0))
+        ]);
+        let rhs = Expr::Term(Term::new(d, 0));
+        
+        let sol = if is_lt {
+            let domain_start = (-b as f64) / (a as f64);
+            SolutionSet::Finite(domain_start, x as f64)
+        } else {
+            SolutionSet::Ray(x as f64, Relation::Gt)
+       };
+        
+        let rel = if is_lt { Relation::Lt } else { Relation::Gt };
+        
+        return Problem {
+            problem_type: ProblemType::IrrationalInequality,
+            difficulty,
+            a: 0, b: 0, c: 0,
+            roots: [x as f64, 0.0],
+            root_count: 1,
+            lhs_expr: Some(lhs),
+            rhs_expr: Some(rhs),
+            relation: rel,
+            solution_set: Some(sol),
+            explicit_solution: None,
+            debug_info: format!("Irr Ineq Displaced. x={}", x),
+        };
+    }
+}
+
+fn generate_irrational_inequality_linear_rhs(difficulty: Difficulty) -> Problem {
+    loop {
+        let x = random_range(-10, 10);
+        let c = random_range(1, 4);
+        let d = random_range(-10, 10);
+        let is_lt = random_range(0, 1) == 0;
+        
+        let rhs_val = c * x + d;
+        if rhs_val < 0 { continue; }
+        
+        let val_sq = rhs_val * rhs_val;
+        
+        let a = loop { let v = random_range(1, 6); if v != 0 { break v; } };
+        let b = val_sq - a * x;
+        
+        if b.abs() > 100 { continue; }
+        
+        let lhs = Expr::Sqrt(Box::new(Expr::Sum(vec![
+            Expr::Term(Term::new(a, 1)),
+            Expr::Term(Term::new(b, 0))
+        ])));
+        let rhs = Expr::Sum(vec![
+            Expr::Term(Term::new(c, 1)),
+            Expr::Term(Term::new(d, 0))
+        ]);
+        
+        let sol = if is_lt {
+            let domain_start = (-b as f64) / (a as f64);
+            SolutionSet::Finite(domain_start, x as f64)
+        } else {
+            SolutionSet::Ray(x as f64, Relation::Gt)
+        };
+        
+        let rel = if is_lt { Relation::Lt } else { Relation::Gt };
+        
+        return Problem {
+            problem_type: ProblemType::IrrationalInequality,
+            difficulty,
+            a: 0, b:0, c:0,
+            roots: [x as f64, 0.0],
+            root_count: 1,
+            lhs_expr: Some(lhs),
+            rhs_expr: Some(rhs),
+            relation: rel,
+            solution_set: Some(sol),
+            explicit_solution: None,
+            debug_info: format!("Irr Ineq Linear RHS. x={}", x),
+        };
+    }
+}
+
+fn generate_irrational_inequality_two_radicals(difficulty: Difficulty) -> Problem {
+    loop {
+        let x = random_range(-10, 10);
+        let val = random_range(0, 50);
+        let is_lt = random_range(0, 1) == 0;
+        
+        let a = random_range(1, 5);
+        let c = loop { let v = random_range(1, 5); if v != a { break v; } };
+        
+        let b = val - a * x;
+        let d = val - c * x;
+        
+        if a * x + b < 0 || c * x + d < 0 { continue; }
+        
+        let lhs = Expr::Sqrt(Box::new(Expr::Sum(vec![
+            Expr::Term(Term::new(a, 1)),
+            Expr::Term(Term::new(b, 0))
+        ])));
+        let rhs = Expr::Sqrt(Box::new(Expr::Sum(vec![
+            Expr::Term(Term::new(c, 1)),
+            Expr::Term(Term::new(d, 0))
+        ])));
+        
+        let sol = if is_lt {
+            let domain_start = ((-b) as f64 / a as f64).max((-d) as f64 / c as f64);
+            SolutionSet::Finite(domain_start, x as f64)
+        } else {
+            SolutionSet::Ray(x as f64, Relation::Gt)
+        };
+        
+        let rel = if is_lt { Relation::Lt } else { Relation::Gt };
+        
+        return Problem {
+            problem_type: ProblemType::IrrationalInequality,
+            difficulty,
+            roots: [x as f64, 0.0],
+            root_count: 1,
+            a: 0, b: 0, c: 0,
+            lhs_expr: Some(lhs),
+            rhs_expr: Some(rhs),
+            relation: rel,
+            solution_set: Some(sol),
+            explicit_solution: None,
+            debug_info: format!("Irr Ineq Two Radicals. x={}", x),
+        };
+    }
+}
+
+fn generate_irrational_inequality_advanced_isolation(difficulty: Difficulty) -> Problem {
+    loop {
+        let x = random_range(-8, 8);
+        let v = random_range(2, 7);
+        let sq = v * v;
+        let is_lt = random_range(0, 1) == 0;
+        
+        let a = random_range(1, 4);
+        let b = sq - a * x;
+        
+        let c = random_range(1, 3);
+        let d = random_range(-8, 8);
+        let k = v - (c * x + d);
+        
+        if b.abs() > 60 || k.abs() > 15 { continue; }
+        if c * x + d < 0 { continue; }
+        if a * x + b < 0 { continue; }
+        
+        let lhs = Expr::Sum(vec![
+            Expr::Sqrt(Box::new(Expr::Sum(vec![
+                Expr::Term(Term::new(a, 1)),
+                Expr::Term(Term::new(b, 0))
+            ]))),
+            Expr::Term(Term::new(c, 1)),
+            Expr::Term(Term::new(d, 0))
+        ]);
+        let rhs = Expr::Term(Term::new(v, 0));
+        
+        let sol = if is_lt {
+            let domain_start = (-b as f64) / (a as f64);
+            SolutionSet::Finite(domain_start, x as f64)
+        } else {
+            SolutionSet::Ray(x as f64, Relation::Gt)
+        };
+        
+        let rel = if is_lt { Relation::Lt } else { Relation::Gt };
+        
+        return Problem {
+            problem_type: ProblemType::IrrationalInequality,
+            difficulty,
+            roots: [x as f64, 0.0],
+            root_count: 1,
+            a: 0, b: 0, c: 0,
+            lhs_expr: Some(lhs),
+            rhs_expr: Some(rhs),
+            relation: rel,
+            solution_set: Some(sol),
+            explicit_solution: None,
+            debug_info: format!("Irr Ineq Adv Isolation. x={}", x),
+        };
+    }
+}
+
+fn generate_irrational_inequality_double(difficulty: Difficulty) -> Problem {
+    loop {
+        let x = random_range(-10, 10);
+        let v1 = random_range(1, 8);
+        let v2 = random_range(1, 8);
+        let e = v1 + v2;
+        let is_lt = random_range(0, 1) == 0;
+        
+        let sq1 = v1 * v1;
+        let sq2 = v2 * v2;
+        
+        let a = loop { let v = random_range(1, 5); if v != 0 { break v; } };
+        let b = sq1 - a * x;
+        
+        let c = loop { let v = random_range(1, 5); if v != 0 { break v; } };
+        let d = sq2 - c * x;
+        
+        if a * x + b < 0 || c * x + d < 0 { continue; }
+        
+        let lhs = Expr::Sum(vec![
+            Expr::Sqrt(Box::new(Expr::Sum(vec![
+                Expr::Term(Term::new(a, 1)),
+                Expr::Term(Term::new(b, 0))
+            ]))),
+            Expr::Sqrt(Box::new(Expr::Sum(vec![
+                Expr::Term(Term::new(c, 1)),
+                Expr::Term(Term::new(d, 0))
+            ])))
+        ]);
+        let rhs = Expr::Term(Term::new(e, 0));
+        
+        let sol = if is_lt {
+            let domain_start = ((-b) as f64 / a as f64).max((-d) as f64 / c as f64);
+            SolutionSet::Finite(domain_start, x as f64)
+        } else {
+            SolutionSet::Ray(x as f64, Relation::Gt)
+        };
+        
+        let rel = if is_lt { Relation::Lt } else { Relation::Gt };
+        
+        return Problem {
+            problem_type: ProblemType::IrrationalInequality,
+            difficulty,
+            roots: [x as f64, 0.0],
+            root_count: 1,
+            a: 0, b: 0, c: 0,
+            lhs_expr: Some(lhs),
+            rhs_expr: Some(rhs),
+            relation: rel,
+            solution_set: Some(sol),
+            explicit_solution: None,
+            debug_info: format!("Irr Ineq Double. x={}, v1={}, v2={}", x, v1, v2),
+        };
+    }
+}
+
+fn generate_absolute_inequality(difficulty: Difficulty) -> Problem {
+    let template = match difficulty {
+        Difficulty::Easy => 0,
+        Difficulty::Medium => random_range(0, 3),
+        Difficulty::Hard => random_range(1, 6),
+    };
+
+    match template {
+        5 => generate_absolute_inequality_quadratic(difficulty),
+        4 => generate_absolute_inequality_nested(difficulty),
+        3 => generate_absolute_inequality_two_abs(difficulty),
+        2 => generate_absolute_inequality_linear_rhs(difficulty),
+        1 => generate_absolute_inequality_simple_complex(difficulty),
+        _ => generate_absolute_inequality_basic(difficulty),
+    }
+}
+
+fn generate_absolute_inequality_basic(difficulty: Difficulty) -> Problem {
+    let a = random_range(-5, 5);
+    let k = random_range(1, 6);
+    let is_lt = random_range(0, 1) == 0;
+    
+    let lhs = Expr::Abs(Box::new(Expr::Sum(vec![
+        Expr::Term(Term::new(1, 1)),
+        Expr::Term(Term::new(-a, 0))
+    ])));
+    let rhs = Expr::Term(Term::new(k, 0));
+    
+    let rel = if is_lt { Relation::Lt } else { Relation::Gt };
+    
+    let sol = if is_lt {
+        SolutionSet::Finite((a - k) as f64, (a + k) as f64)
+    } else {
+        SolutionSet::External((a - k) as f64, (a + k) as f64)
+    };
+    
+    Problem {
+        problem_type: ProblemType::AbsoluteValueInequality,
+        difficulty,
+        a: 0, b:0, c:0,
+        roots: [a as f64, 0.0],
+        root_count: 1,
+        lhs_expr: Some(lhs),
+        rhs_expr: Some(rhs),
+        relation: rel,
+        solution_set: Some(sol),
+        explicit_solution: None,
+        debug_info: format!("Abs Ineq Basic. center={}, dist={}", a, k),
+    }
+}
+
+fn generate_absolute_inequality_simple_complex(difficulty: Difficulty) -> Problem {
+    loop {
+        let r1 = random_range(-10, 10);
+        let r2 = random_range(-10, 10);
+        if r1 == r2 { continue; }
+        
+        let a = random_range(1, 4);
+        let sum = r1 + r2;
+        let diff = (r1 - r2).abs();
+        
+        if (a * sum) % 2 != 0 || (a * diff) % 2 != 0 { continue; }
+        
+        let b = -(a * sum) / 2;
+        let c = (a * diff) / 2;
+        let is_lt = random_range(0, 1) == 0;
+        
+        let lhs = Expr::Abs(Box::new(Expr::Sum(vec![
+            Expr::Term(Term::new(a, 1)),
+            Expr::Term(Term::new(b, 0))
+        ])));
+        let rhs = Expr::Term(Term::new(c, 0));
+        
+        let mut roots = [r1 as f64, r2 as f64];
+        roots.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        
+        let rel = if is_lt { Relation::Lt } else { Relation::Gt };
+        let sol = if is_lt {
+            SolutionSet::Finite(roots[0], roots[1])
+        } else {
+            SolutionSet::External(roots[0], roots[1])
+        };
+
+        return Problem {
+            problem_type: ProblemType::AbsoluteValueInequality,
+            difficulty,
+            roots,
+            root_count: 2,
+            a: 0, b: 0, c: 0,
+            lhs_expr: Some(lhs),
+            rhs_expr: Some(rhs),
+            relation: rel,
+            solution_set: Some(sol),
+            explicit_solution: None,
+            debug_info: format!("Abs Ineq Simple. r={},{}", r1, r2),
+        }
+    }
+}
+
+fn generate_absolute_inequality_linear_rhs(difficulty: Difficulty) -> Problem {
+    loop {
+        let r1 = random_range(-8, 8);
+        let r2 = random_range(-8, 8);
+        if r1 == r2 { continue; }
+        
+        let a = random_range(1, 5);
+        let c = random_range(1, 5);
+        if a == c { continue; }
+        
+        let two_d = a * (r1 - r2) - c * (r1 + r2);
+        let two_b = -a * (r1 + r2) + c * (r1 - r2);
+        
+        if two_d % 2 != 0 || two_b % 2 != 0 { continue; }
+        
+        let d = two_d / 2;
+        let b = two_b / 2;
+        
+        if c * r1 + d < 0 || c * r2 + d < 0 { continue; }
+        
+        let is_lt = random_range(0, 1) == 0;
+        
+        let lhs = Expr::Abs(Box::new(Expr::Sum(vec![
+            Expr::Term(Term::new(a, 1)),
+            Expr::Term(Term::new(b, 0))
+        ])));
+        let rhs = Expr::Sum(vec![
+            Expr::Term(Term::new(c, 1)),
+            Expr::Term(Term::new(d, 0))
+        ]);
+        
+        let mut roots = [r1 as f64, r2 as f64];
+        roots.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        
+        let rel = if is_lt { Relation::Lt } else { Relation::Gt };
+        let sol = if is_lt {
+            SolutionSet::Finite(roots[0], roots[1])
+        } else {
+            SolutionSet::External(roots[0], roots[1])
+        };
+
+        return Problem {
+            problem_type: ProblemType::AbsoluteValueInequality,
+            difficulty,
+            roots,
+            root_count: 2,
+            a: 0, b:0, c:0,
+            lhs_expr: Some(lhs),
+            rhs_expr: Some(rhs),
+            relation: rel,
+            solution_set: Some(sol),
+            explicit_solution: None,
+            debug_info: format!("Abs Ineq Linear RHS. r={},{}", r1, r2),
+        };
+    }
+}
+
+fn generate_absolute_inequality_two_abs(difficulty: Difficulty) -> Problem {
+    loop {
+        let r1 = random_range(-8, 8);
+        let r2 = random_range(-8, 8);
+        if r1 == r2 { continue; }
+        
+        let a = random_range(1, 5);
+        let c = loop { let v = random_range(1, 5); if v != a { break v; } };
+        
+        let two_d = a * (r1 - r2) - c * (r1 + r2);
+        let two_b = -a * (r1 + r2) + c * (r1 - r2);
+        
+        if two_d % 2 != 0 || two_b % 2 != 0 { continue; }
+        
+        let d = two_d / 2;
+        let b = two_b / 2;
+        let is_lt = random_range(0, 1) == 0;
+        
+        let lhs = Expr::Abs(Box::new(Expr::Sum(vec![
+            Expr::Term(Term::new(a, 1)),
+            Expr::Term(Term::new(b, 0))
+        ])));
+        let rhs = Expr::Abs(Box::new(Expr::Sum(vec![
+            Expr::Term(Term::new(c, 1)),
+            Expr::Term(Term::new(d, 0))
+        ])));
+        
+        let mut roots = [r1 as f64, r2 as f64];
+        roots.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        
+        let rel = if is_lt { Relation::Lt } else { Relation::Gt };
+        let sol = if is_lt {
+            SolutionSet::Finite(roots[0], roots[1])
+        } else {
+            SolutionSet::External(roots[0], roots[1])
+        };
+
+        return Problem {
+            problem_type: ProblemType::AbsoluteValueInequality,
+            difficulty,
+            roots,
+            root_count: 2,
+            a: 0, b:0, c:0,
+            lhs_expr: Some(lhs),
+            rhs_expr: Some(rhs),
+            relation: rel,
+            solution_set: Some(sol),
+            explicit_solution: None,
+            debug_info: format!("Abs Ineq Two Abs. r={},{}", r1, r2),
+        };
+    }
+}
+
+fn generate_absolute_inequality_nested(difficulty: Difficulty) -> Problem {
+    loop {
+        let r1 = random_range(-8, 8);
+        let r2 = random_range(-8, 8);
+        if r1 == r2 { continue; }
+        
+        let a = random_range(1, 4);
+        let sum = r1 + r2;
+        let diff = (r1 - r2).abs();
+        
+        if (a * sum) % 2 != 0 || (a * diff) % 2 != 0 { continue; }
+        
+        let b = -(a * sum) / 2;
+        let k = (a * diff) / 2;
+        
+        let min_d = (k / 2) + 1;
+        let d = random_range(min_d, min_d + 5);
+        let c = k - d;
+        
+        if c == 0 { continue; }
+        let is_lt = random_range(0, 1) == 0;
+        
+        let inner_abs = Expr::Abs(Box::new(Expr::Sum(vec![
+            Expr::Term(Term::new(a, 1)),
+            Expr::Term(Term::new(b, 0))
+        ])));
+        
+        let lhs = Expr::Abs(Box::new(Expr::Sum(vec![
+            inner_abs,
+            Expr::Term(Term::new(-c, 0))
+        ])));
+        
+        let rhs = Expr::Term(Term::new(d, 0));
+        
+        let mut roots = [r1 as f64, r2 as f64];
+        roots.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        
+        let rel = if is_lt { Relation::Lt } else { Relation::Gt };
+        let sol = if is_lt {
+            SolutionSet::Finite(roots[0], roots[1])
+        } else {
+            SolutionSet::External(roots[0], roots[1])
+        };
+        
+        return Problem {
+            problem_type: ProblemType::AbsoluteValueInequality,
+            difficulty,
+            roots,
+            root_count: 2,
+            a: 0, b:0, c:0,
+            lhs_expr: Some(lhs),
+            rhs_expr: Some(rhs),
+            relation: rel,
+            solution_set: Some(sol),
+            explicit_solution: None,
+            debug_info: format!("Abs Ineq Nested. r={},{}", r1, r2),
+        };
+    }
+}
+
+fn generate_absolute_inequality_quadratic(difficulty: Difficulty) -> Problem {
+    loop {
+        let r1 = random_range(-6, 6);
+        let r2 = random_range(-6, 6);
+        if r1 == r2 { continue; }
+        
+        let b = -(r1 + r2);
+        let c_minus_d = r1 * r2;
+        
+        let min_2d = (b * b) / 4 - c_minus_d;
+        let min_d = (min_2d / 2) + 2;
+        
+        let d_start = if min_d < 1 { 1 } else { min_d };
+        let d = random_range(d_start, d_start + 5);
+        
+        let c = d + c_minus_d;
+        let is_lt = random_range(0, 1) == 0;
+        
+        let poly = Expr::Sum(vec![
+            Expr::Term(Term::new(1, 2)),
+            Expr::Term(Term::new(b, 1)),
+            Expr::Term(Term::new(c, 0)),
+        ]);
+        
+        let lhs = Expr::Abs(Box::new(poly));
+        let rhs = Expr::Term(Term::new(d, 0));
+        
+        let mut roots = [r1 as f64, r2 as f64];
+        roots.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        
+        let rel = if is_lt { Relation::Lt } else { Relation::Gt };
+        let sol = if is_lt {
+            SolutionSet::Finite(roots[0], roots[1])
+        } else {
+            SolutionSet::External(roots[0], roots[1])
+        };
+
+        return Problem {
+            problem_type: ProblemType::AbsoluteValueInequality,
+            difficulty,
+            roots,
+            root_count: 2,
+            a: 0, b:0, c:0,
+            lhs_expr: Some(lhs),
+            rhs_expr: Some(rhs),
+            relation: rel,
+            solution_set: Some(sol),
+            explicit_solution: None,
+            debug_info: format!("Abs Ineq Quad. r={},{}", r1, r2),
+        };
     }
 }
 
@@ -301,7 +1243,7 @@ fn generate_rational_ratio(difficulty: Difficulty) -> Problem {
                  root_count: 1,
                  lhs_expr: Some(lhs),
                  rhs_expr: Some(rhs),
-                 explicit_solution: None,
+                 relation: Relation::Eq, solution_set: None, explicit_solution: None,
                  debug_info: format!("Ratio Gen. r={}", r_val),
              };
          }
@@ -384,7 +1326,7 @@ fn generate_rational_standard(difficulty: Difficulty, split: bool) -> Problem {
                  root_count: 2,
                  lhs_expr: Some(lhs),
                  rhs_expr: Some(rhs),
-                 explicit_solution: None,
+                 relation: Relation::Eq, solution_set: None, explicit_solution: None,
                  debug_info: format!("Std Rational. r={:.2},{:.2}", r1, r2),
              };
          }
@@ -447,7 +1389,7 @@ fn generate_rational_linear_num(difficulty: Difficulty) -> Problem {
                  root_count: 2,
                  lhs_expr: Some(lhs),
                  rhs_expr: Some(rhs),
-                 explicit_solution: None,
+                 relation: Relation::Eq, solution_set: None, explicit_solution: None,
                  debug_info: format!("Linear Num Gen. r={:.2},{:.2}", r1, r2),
              };
          }
@@ -525,7 +1467,7 @@ fn generate_rational_common_denom(difficulty: Difficulty) -> Problem {
                  root_count: 2,
                  lhs_expr: Some(lhs),
                  rhs_expr: Some(rhs),
-                 explicit_solution: None,
+                 relation: Relation::Eq, solution_set: None, explicit_solution: None,
                  debug_info: format!("Common Denom Gen. r={:.2},{:.2}", r1, r2),
              };
          }
@@ -578,7 +1520,7 @@ fn generate_irrational_simple(difficulty: Difficulty) -> Problem {
             root_count: 1,
             lhs_expr: Some(lhs),
             rhs_expr: Some(rhs),
-            explicit_solution: None,
+            relation: Relation::Eq, solution_set: None, explicit_solution: None,
             debug_info: format!("Irr Simple. x={}", x),
         };
     }
@@ -643,7 +1585,7 @@ fn generate_irrational_linear_rhs(difficulty: Difficulty) -> Problem {
              root_count: 1,
              lhs_expr: Some(lhs),
              rhs_expr: Some(rhs),
-             explicit_solution: None,
+             relation: Relation::Eq, solution_set: None, explicit_solution: None,
              debug_info: format!("Irr Linear RHS. x={}", x),
          };
      }
@@ -678,7 +1620,7 @@ fn generate_irrational_two_radicals(difficulty: Difficulty) -> Problem {
              a: 0, b: 0, c: 0,
              lhs_expr: Some(lhs),
              rhs_expr: Some(rhs),
-             explicit_solution: None,
+             relation: Relation::Eq, solution_set: None, explicit_solution: None,
              debug_info: format!("Two Radicals. x={}", x),
          };
     }
@@ -721,7 +1663,7 @@ fn generate_irrational_double(difficulty: Difficulty) -> Problem {
              a: 0, b: 0, c: 0,
              lhs_expr: Some(lhs),
              rhs_expr: Some(rhs),
-             explicit_solution: None,
+             relation: Relation::Eq, solution_set: None, explicit_solution: None,
              debug_info: format!("Double Radical. x={}, v1={}, v2={}", x, v1, v2),
          };
     }
@@ -780,7 +1722,7 @@ fn generate_absolute_simple(difficulty: Difficulty) -> Problem {
              a: 0, b: 0, c: 0,
              lhs_expr: Some(lhs),
              rhs_expr: Some(rhs),
-             explicit_solution: None,
+             relation: Relation::Eq, solution_set: None, explicit_solution: None,
              debug_info: format!("Abs Simple. r={},{}. A={}", r1, r2, a),
         }
     }
@@ -830,7 +1772,7 @@ fn generate_absolute_linear_rhs(difficulty: Difficulty) -> Problem {
              a: 0, b:0, c:0,
              lhs_expr: Some(lhs),
              rhs_expr: Some(rhs),
-             explicit_solution: None,
+             relation: Relation::Eq, solution_set: None, explicit_solution: None,
              debug_info: format!("Abs Linear RHS. r={},{}. A={}, C={}", r1, r2, a, c),
          };
      }
@@ -874,7 +1816,7 @@ fn generate_absolute_two_abs(difficulty: Difficulty) -> Problem {
              a: 0, b:0, c:0,
              lhs_expr: Some(lhs),
              rhs_expr: Some(rhs),
-             explicit_solution: None,
+             relation: Relation::Eq, solution_set: None, explicit_solution: None,
              debug_info: format!("Two Abs. r={},{}.", r1, r2),
          };
      }
@@ -926,7 +1868,7 @@ fn generate_absolute_nested(difficulty: Difficulty) -> Problem {
              a: 0, b:0, c:0,
              lhs_expr: Some(lhs),
              rhs_expr: Some(rhs),
-             explicit_solution: None,
+             relation: Relation::Eq, solution_set: None, explicit_solution: None,
              debug_info: format!("Nested Abs. r={},{}. K={}", r1, r2, k),
          };
     }
@@ -972,7 +1914,7 @@ fn generate_absolute_quadratic(difficulty: Difficulty) -> Problem {
              a: 0, b:0, c:0,
              lhs_expr: Some(lhs),
              rhs_expr: Some(rhs),
-             explicit_solution: None,
+             relation: Relation::Eq, solution_set: None, explicit_solution: None,
              debug_info: format!("Abs Quad. r={},{}. D={}", r1, r2, d),
          };
     }
@@ -1012,7 +1954,7 @@ fn generate_irrational_advanced_isolation(difficulty: Difficulty) -> Problem {
             a: 0, b: 0, c: 0,
             lhs_expr: Some(lhs),
             rhs_expr: Some(rhs),
-            explicit_solution: None,
+            relation: Relation::Eq, solution_set: None, explicit_solution: None,
             debug_info: format!("Irr Adv Isolation. x={}", x),
         };
     }
@@ -1065,7 +2007,7 @@ fn generate_irrational_triple(difficulty: Difficulty) -> Problem {
             a: 0, b: 0, c: 0,
             lhs_expr: Some(lhs),
             rhs_expr: Some(rhs),
-            explicit_solution: None,
+            relation: Relation::Eq, solution_set: None, explicit_solution: None,
             debug_info: format!("Triple Radical. x={}", x),
         };
     }
@@ -1115,7 +2057,7 @@ fn generate_absolute_quadratic_rhs(difficulty: Difficulty) -> Problem {
             a: 0, b: 0, c: 0,
             lhs_expr: Some(lhs),
             rhs_expr: Some(rhs),
-            explicit_solution: None,
+            relation: Relation::Eq, solution_set: None, explicit_solution: None,
             debug_info: format!("Abs Quad RHS. r={},{}", r1, r2),
         };
     }
@@ -1176,7 +2118,7 @@ fn generate_absolute_double_nested(difficulty: Difficulty) -> Problem {
             a: 0, b: 0, c: 0,
             lhs_expr: Some(lhs),
             rhs_expr: Some(rhs),
-            explicit_solution: None,
+            relation: Relation::Eq, solution_set: None, explicit_solution: None,
             debug_info: format!("Double Nested Abs. r={},{}", r1, r2),
         };
     }
@@ -1227,7 +2169,7 @@ fn generate_irrational_radical_difference(difficulty: Difficulty) -> Problem {
             a: 0, b: 0, c: 0,
             lhs_expr: Some(lhs),
             rhs_expr: Some(rhs),
-            explicit_solution: None,
+            relation: Relation::Eq, solution_set: None, explicit_solution: None,
             debug_info: format!("Radical Difference. x={}", x),
         };
     }
@@ -1282,7 +2224,7 @@ fn generate_irrational_nested_radical(difficulty: Difficulty) -> Problem {
             a: 0, b: 0, c: 0,
             lhs_expr: Some(lhs),
             rhs_expr: Some(rhs),
-            explicit_solution: None,
+            relation: Relation::Eq, solution_set: None, explicit_solution: None,
             debug_info: format!("Nested Radical. x={}", x),
         };
     }
@@ -1358,7 +2300,7 @@ fn generate_linear(difficulty: Difficulty) -> Problem {
         root_count: 1,
         lhs_expr: Some(obfuscated.lhs),
         rhs_expr: Some(obfuscated.rhs),
-        explicit_solution: None,
+        relation: Relation::Eq, solution_set: None, explicit_solution: None,
         debug_info: format!("Linear Gen. m={}, q={}, root={:.2}", m, q, root_val),
     }
 }
@@ -1387,7 +2329,7 @@ fn generate_quadratic(difficulty: Difficulty) -> Problem {
                 root_count: 2,
                 lhs_expr: Some(obfuscated.lhs),
                 rhs_expr: Some(obfuscated.rhs),
-                explicit_solution: None,
+                relation: Relation::Eq, solution_set: None, explicit_solution: None,
                 debug_info: format!("Quad Easy. r1={}, r2={}", r1, r2),
             }
         }
@@ -1416,7 +2358,7 @@ fn generate_quadratic(difficulty: Difficulty) -> Problem {
                 root_count: 2,
                 lhs_expr: Some(obfuscated.lhs),
                 rhs_expr: Some(obfuscated.rhs),
-                explicit_solution: None,
+                relation: Relation::Eq, solution_set: None, explicit_solution: None,
                 debug_info: format!("Quad Medium. Roots: {}/{}, {}/{}", n, d, m, e),
             }
         }
@@ -1450,7 +2392,7 @@ fn generate_quadratic(difficulty: Difficulty) -> Problem {
                     root_count: 2,
                     lhs_expr: Some(obfuscated.lhs),
                     rhs_expr: Some(obfuscated.rhs),
-                    explicit_solution: Some(format!("x = {} \\pm \\sqrt{{{}}}", p, q)),
+                    relation: Relation::Eq, solution_set: None, explicit_solution: Some(format!("x = {} \\pm \\sqrt{{{}}}", p, q)),
                     debug_info: format!("Quad Hard Surd. p={}, q={}", p, q),
                 }
             } else {
@@ -1478,7 +2420,7 @@ fn generate_quadratic(difficulty: Difficulty) -> Problem {
                     root_count: 2,
                     lhs_expr: Some(obfuscated.lhs),
                     rhs_expr: Some(obfuscated.rhs),
-                    explicit_solution: None,
+                    relation: Relation::Eq, solution_set: None, explicit_solution: None,
                     debug_info: format!("Quad Hard Rational. Roots: {}/{}, {}/{}", n, d, m, e),
                 }
             }
@@ -1502,7 +2444,7 @@ mod tests {
             root_count: 2,
             lhs_expr: None,
             rhs_expr: None,
-            explicit_solution: None,
+            relation: Relation::Eq, solution_set: None, explicit_solution: None,
             debug_info: String::new(),
         };
         assert_eq!(p.to_latex(), "x^2 - 5x + 6 = 0");
@@ -1520,7 +2462,7 @@ mod tests {
             root_count: 2,
             lhs_expr: None,
             rhs_expr: None,
-            explicit_solution: None,
+            relation: Relation::Eq, solution_set: None, explicit_solution: None,
             debug_info: String::new(),
         };
         assert_eq!(p.to_latex(), "x^2 - 4 = 0");
@@ -1538,7 +2480,7 @@ mod tests {
             root_count: 2,
             lhs_expr: None,
             rhs_expr: None,
-            explicit_solution: None,
+            relation: Relation::Eq, solution_set: None, explicit_solution: None,
             debug_info: String::new(),
         };
         assert_eq!(p.to_latex(), "-x^2 + x + 2 = 0");
@@ -1556,7 +2498,7 @@ mod tests {
             root_count: 1,
             lhs_expr: None,
             rhs_expr: None,
-            explicit_solution: None,
+            relation: Relation::Eq, solution_set: None, explicit_solution: None,
             debug_info: String::new(),
         };
         assert_eq!(p.to_latex(), "2x - 6 = 0");
@@ -1606,7 +2548,7 @@ mod tests {
             root_count: 0,
             lhs_expr: None,
             rhs_expr: None,
-            explicit_solution: None,
+            relation: Relation::Eq, solution_set: None, explicit_solution: None,
             debug_info: String::new(),
         };
         assert_eq!(p.solution_latex(), "impossible");

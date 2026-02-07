@@ -109,6 +109,11 @@ fn app() -> Html {
                 "rational" => ProblemType::Rational,
                 "irrational" => ProblemType::Irrational,
                 "absolute-value" => ProblemType::AbsoluteValue,
+                "linear-inequality" => ProblemType::LinearInequality,
+                "quadratic-inequality" => ProblemType::QuadraticInequality,
+                "rational-inequality" => ProblemType::RationalInequality,
+                "irrational-inequality" => ProblemType::IrrationalInequality,
+                "absolute-value-inequality" => ProblemType::AbsoluteValueInequality,
                 _ => ProblemType::Quadratic,
             };
             problem_type.set(new_type);
@@ -132,6 +137,11 @@ fn app() -> Html {
                         <option value="rational" selected={*problem_type == ProblemType::Rational}>{"Rational Equations"}</option>
                         <option value="irrational" selected={*problem_type == ProblemType::Irrational}>{"Irrational Equations"}</option>
                         <option value="absolute-value" selected={*problem_type == ProblemType::AbsoluteValue}>{"Absolute Value Equations"}</option>
+                        <option value="linear-inequality" selected={*problem_type == ProblemType::LinearInequality}>{"Linear Inequalities"}</option>
+                        <option value="quadratic-inequality" selected={*problem_type == ProblemType::QuadraticInequality}>{"Quadratic Inequalities"}</option>
+                        <option value="rational-inequality" selected={*problem_type == ProblemType::RationalInequality}>{"Rational Inequalities"}</option>
+                        <option value="irrational-inequality" selected={*problem_type == ProblemType::IrrationalInequality}>{"Irrational Inequalities"}</option>
+                        <option value="absolute-value-inequality" selected={*problem_type == ProblemType::AbsoluteValueInequality}>{"Absolute Value Inequalities"}</option>
                     </select>
                 </div>
 

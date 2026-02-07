@@ -166,36 +166,39 @@ label {
 select,
 input[type="number"] {
     padding: 1rem 1.25rem;
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(102, 126, 234, 0.3);
     border-radius: 16px;
     font-size: 1rem;
     font-weight: 500;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    background: rgba(26, 26, 46, 0.9);
-    color: #fff;
+    background: #ffffff;
+    color: #1a1a2e;
     cursor: pointer;
     -webkit-appearance: none;
     -moz-appearance: none;
     appearance: none;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 select {
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='white' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10l-5 5z'/%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%231a1a2e' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10l-5 5z'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
     background-position: right 1rem center;
+    background-color: #ffffff;
     padding-right: 2.5rem;
 }
 
 select option {
-    background: #1a1a2e;
-    color: #fff;
+    background: #ffffff;
+    color: #1a1a2e;
     padding: 0.5rem;
 }
 
 select:hover,
 input[type="number"]:hover {
     border-color: rgba(102, 126, 234, 0.6);
-    background: rgba(26, 26, 46, 1);
+    background: #ffffff;
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
 }
 
 select:focus,
@@ -203,7 +206,7 @@ input[type="number"]:focus {
     outline: none;
     border-color: #667eea;
     box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.25);
-    background: rgba(26, 26, 46, 1);
+    background: #ffffff;
 }
 
 .generate-btn {
@@ -325,13 +328,16 @@ ol li:hover {
 .latex {
     display: block;
     overflow-x: auto;
-    padding: 0.75rem 0;
+    padding: 1rem 1.25rem;
     font-size: 1.15rem;
-    color: #fff;
+    color: #1a1a2e;
     max-width: 100%;
     scrollbar-width: thin;
-    scrollbar-color: rgba(102, 126, 234, 0.5) rgba(255, 255, 255, 0.1);
+    scrollbar-color: rgba(102, 126, 234, 0.5) rgba(0, 0, 0, 0.1);
     flex: 1;
+    background: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .latex::-webkit-scrollbar {
@@ -339,7 +345,7 @@ ol li:hover {
 }
 
 .latex::-webkit-scrollbar-track {
-    background: rgba(255, 255, 255, 0.1);
+    background: rgba(0, 0, 0, 0.1);
     border-radius: 10px;
 }
 
@@ -366,19 +372,19 @@ mjx-mroot,
 mjx-msub,
 mjx-msup,
 mjx-msubsup {
-    color: #fff !important;
-    fill: #fff !important;
+    color: #1a1a2e !important;
+    fill: #1a1a2e !important;
 }
 
 mjx-container[jax="CHTML"] {
     direction: ltr;
 }
 
-/* Ensure SVG strokes are white too */
+/* Ensure SVG strokes are dark too */
 .MathJax svg path,
 mjx-container svg path {
-    stroke: #fff !important;
-    fill: #fff !important;
+    stroke: #1a1a2e !important;
+    fill: #1a1a2e !important;
 }
 
 footer {

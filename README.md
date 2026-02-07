@@ -23,6 +23,11 @@ Resoluto is a tool built by a mathematics teacher for fellow educators. It gener
 | **Rational Equations** | Equations with fractions like `A/(x-p) + B/(x-q) = K` | Easy, Medium, Hard |
 | **Irrational Equations** | Equations with square roots like `√(Ax+B) = C` | Easy, Medium, Hard |
 | **Absolute Value Equations** | Equations with `\|...\|` like `\|Ax+B\| = C` | Easy, Medium, Hard |
+| **Linear Inequalities** | `mx + q > 0` | Easy, Medium, Hard |
+| **Quadratic Inequalities** | `ax² + bx + c < 0` | Easy, Medium, Hard |
+| **Rational Inequalities** | `P(x)/Q(x) > 0` | Easy, Medium, Hard |
+| **Irrational Inequalities** | `√(Ax+B) > C` or `√(Ax+B) < C` | Easy, Medium, Hard |
+| **Absolute Value Inequalities** | `\|Ax+B\| > C` or `\|Ax+B\| < C` | Easy, Medium, Hard |
 
 ### Core Capabilities
 
@@ -99,6 +104,12 @@ cargo run --bin resoluto_cli -- -n 5 -t irrational
 
 # Generate absolute value equations
 cargo run --bin resoluto_cli -- -n 5 -t absolute-value
+
+# Generate linear inequalities
+cargo run --bin resoluto_cli -- -n 5 -t linear-inequality
+
+# Generate quadratic inequalities
+cargo run --bin resoluto_cli -- -n 5 -t quadratic-inequality
 ```
 
 **Options:**
@@ -106,7 +117,7 @@ cargo run --bin resoluto_cli -- -n 5 -t absolute-value
 |------|-------------|---------|
 | `-n, --count <N>` | Number of problems to generate | 5 |
 | `-d, --difficulty <LEVEL>` | `easy`, `medium`, or `hard` | easy |
-| `-t, --problem-type <TYPE>` | `linear`, `quadratic`, `rational`, `irrational`, `absolute-value` | quadratic |
+| `-t, --problem-type <TYPE>` | `linear`, `quadratic`, `rational`, `irrational`, `absolute-value`, `linear-inequality`, `quadratic-inequality`, ... | quadratic |
 
 ### Web Application
 

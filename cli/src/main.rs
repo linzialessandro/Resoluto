@@ -39,6 +39,11 @@ enum ProblemTypeArg {
     Rational,
     Irrational,
     AbsoluteValue,
+    LinearInequality,
+    QuadraticInequality,
+    RationalInequality,
+    IrrationalInequality,
+    AbsoluteValueInequality,
 }
 
 impl From<ProblemTypeArg> for ProblemType {
@@ -49,6 +54,11 @@ impl From<ProblemTypeArg> for ProblemType {
             ProblemTypeArg::Rational => ProblemType::Rational,
             ProblemTypeArg::Irrational => ProblemType::Irrational,
             ProblemTypeArg::AbsoluteValue => ProblemType::AbsoluteValue,
+            ProblemTypeArg::LinearInequality => ProblemType::LinearInequality,
+            ProblemTypeArg::QuadraticInequality => ProblemType::QuadraticInequality,
+            ProblemTypeArg::RationalInequality => ProblemType::RationalInequality,
+            ProblemTypeArg::IrrationalInequality => ProblemType::IrrationalInequality,
+            ProblemTypeArg::AbsoluteValueInequality => ProblemType::AbsoluteValueInequality,
         }
     }
 }
